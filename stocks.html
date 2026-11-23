@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>美股＋新聞</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#0b0e14;color:#e6e6e6;
+    font-family:-apple-system,"PingFang HK","Microsoft JhengHei",sans-serif;
+    overflow:hidden}
+  #wrap{height:100%;display:flex;flex-direction:column;padding:14px 20px 10px;
+    box-sizing:border-box}
+  header{display:flex;justify-content:space-between;align-items:baseline;
+    border-bottom:1px solid #2a3342;padding-bottom:8px}
+  h1{font-size:26px;margin:0;font-weight:600}
+  #clock{font-size:40px;font-weight:200;letter-spacing:2px}
+  #date{font-size:18px;color:#9aa4b2;margin-left:12px}
+  #status{font-size:18px;color:#9aa4b2;text-align:right}
+  #status b{color:#e6e6e6}
+  .open{color:#4ade80}
+  .closed{color:#f5a623}
+  #indices{display:flex;gap:10px;margin:12px 0}
+  .idx{flex:1;background:#161b26;border-radius:8px;padding:8px 12px}
+  .idx .n{font-size:17px;color:#9aa4b2}
+  .idx .p{font-size:24px;font-weight:600;margin-top:2px}
+  .idx .c{font-size:19px;margin-left:8px}
+  .up{color:#4ade80}
+  .down{color:#f87171}
+  #main{flex:1;display:flex;gap:18px;min-height:0}
+  #stocks{flex:1.25;min-width:0}
+  #stocks h2,#news h2{font-size:19px;color:#9aa4b2;margin:0 0 8px;font-weight:500}
+  #grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 22px}
+  .row{display:flex;justify-content:space-between;align-items:baseline;
+    background:#161b26;border-radius:6px;padding:6px 12px;font-size:20px}
+  .row .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .tk{font-size:16px;color:#9aa4b2;margin-left:6px}
+  .row .pr{font-weight:600;white-space:nowrap}
+  .row .ch{font-size:19px;margin-left:10px;white-space:nowrap}
+  #news{flex:1;min-width:0;display:flex;flex-direction:column}
+  #list{overflow:hidden}
+  .item{padding:9px 2px;border-bottom:1px solid #232a38}
+  .item .t{font-size:20px;line-height:1.35}
+  .item .s{font-size:16px;color:#9aa4b2;margin-top:3px}
+  footer{font-size:15px;color:#5c6675;text-align:right;padding-top:6px}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <div><h1>美股＋新聞</h1></div>
+    <div><span id="clock"></span><span id="date"></span></div>
+    <div id="status"></div>
+  </header>
+  <div id="indices"></div>
+  <div id="main">
+    <div id="stocks"><h2>觀察名單 25 隻</h2><div id="grid"></div></div>
+    <div id="news"><h2>最新頭條</h2><div id="list"></div></div>
+  </div>
+  <footer>每 10 分鐘自動更新 · 股價延遲約 15 分鐘</footer>
+</div>
+<script>
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function fmtChg(c) {
+  if (c == null) return '<span class="ch">—</span>';
+  var cls = c > 0 ? 'up' : (c < 0 ? 'down' : '');
+  var sign = c > 0 ? '+' : '';
+  return '<span class="ch ' + cls + '">' + sign + c.toFixed(2) + '%</span>';
+}
+function render(d) {
+  var st = document.getElementById('status');
+  st.innerHTML = '美股 <b class="' + (d.market === '開市中' ? 'open' : 'closed') +
+    '">' + esc(d.market) + '</b> · 更新於 <b>' + esc(d.updated) + '</b>';
+  var ih = '';
+  for (var i = 0; i < d.indices.length; i++) {
+    var x = d.indices[i];
+    ih += '<div class="idx"><div class="n">' + esc(x.name) + '</div>' +
+      '<div><span class="p">' + x.price.toLocaleString() + '</span>' +
+      fmtChg(x.chg) + '</div></div>';
+  }
+  document.getElementById('indices').innerHTML = ih;
+  var gh = '';
+  for (var j = 0; j < d.stocks.length; j++) {
+    var s = d.stocks[j];
+    gh += '<div class="row"><span class="nm">' + esc(s.name) +
+      '<span class="tk">' + esc(s.ticker) + '</span></span>' +
+      '<span><span class="pr">$' + s.price.toFixed(2) + '</span>' +
+      fmtChg(s.chg) + '</span></div>';
+  }
+  document.getElementById('grid').innerHTML = gh;
+  var nh = '';
+  for (var k = 0; k < d.news.length; k++) {
+    var n = d.news[k];
+    nh += '<div class="item"><div class="t">' + esc(n.t) + '</div>' +
+      '<div class="s">' + esc(n.src) + (n.ago ? ' · ' + esc(n.ago) : '') +
+      '</div></div>';
+  }
+  document.getElementById('list').innerHTML =
+    nh || '<div class="item"><div class="t">新聞暫時攞唔到，下一轉再試。</div></div>';
+}
+function loadData() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'stocks.json?_=' + Date.now(), true);
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      try { render(JSON.parse(xhr.responseText)); } catch (e) {}
+    }
+  };
+  xhr.send();
+}
+function tickClock() {
+  var n = new Date();
+  function p(x) { x = String(x); return x.length < 2 ? '0' + x : x; }
+  document.getElementById('clock').textContent =
+    p(n.getHours()) + ':' + p(n.getMinutes());
+  var week = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  document.getElementById('date').textContent =
+    (n.getMonth() + 1) + '月' + n.getDate() + '日  ' + week[n.getDay()];
+}
+tickClock(); setInterval(tickClock, 20000);
+loadData();
+setInterval(loadData, 10 * 60 * 1000);
+</script>
+</body>
+</html>
